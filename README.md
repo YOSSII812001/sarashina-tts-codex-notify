@@ -1,0 +1,111 @@
+# sarashina-tts-codex-notify
+
+Codex の通知音声を Microsoft Edge TTS から Sarashina2.2-TTS に切り替えるための、Windows 向けセットアップです。
+
+このリポジトリは glue code だけを含みます。Sarashina2.2-TTS 本体、モデル、実在人物の音声素材、生成音声は同梱しません。
+
+## できること
+
+- Codex の `notify` を Sarashina2.2-TTS へ転送します
+- 1回目はモデルを読み込み、2回目以降は常駐デーモンで高速化します
+- 参照音声を差し替えると、好みの声に寄せられます
+- 旧 Edge TTS フックが残っている環境では、任意で Sarashina へ転送できます
+
+## 注意
+
+- Sarashina2.2-TTS とモデルのライセンスは、上流の条件に従ってください。
+- Sarashina2.2-TTS は非商用ライセンスで公開されています。商用利用では権利者へ確認してください。
+- 第三者の声を参照音声に使う場合は、本人または権利者の許諾を取ってください。
+- 公開リポジトリに、声優、ナレーター、顧客などの実音声を入れないでください。
+
+## クイックスタート
+
+PowerShell で実行します。
+
+```powershell
+Set-Location $env:USERPROFILE
+git clone https://github.com/YOSSII812001/sarashina-tts-codex-notify.git
+Set-Location .\sarashina-tts-codex-notify
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ConfigureCodex
+```
+
+インストール後、Codex を再起動してください。
+
+## 動作確認
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test_notify.ps1
+```
+
+音声が鳴り、`%TEMP%\sarashina_tts_outputs` に WAV が作られれば成功です。
+
+## 参照音声を変える
+
+インストール後、次のファイルを編集します。
+
+```text
+%USERPROFILE%\.codex\skills\sarashina-tts\settings.json
+```
+
+例:
+
+```json
+{
+  "prompt_name": "my private voice sample",
+  "prompt_file": "C:/path/to/my_voice_sample.wav",
+  "prompt_text": "この音声で実際に話している文章です。"
+}
+```
+
+`prompt_text` は、参照音声で話している文章と一致させてください。
+差が大きいと、声質や話し方が崩れやすくなります。
+
+変更後は、デーモンを再起動します。
+
+```powershell
+Get-CimInstance Win32_Process |
+  Where-Object { $_.Name -like 'python*' -and $_.CommandLine -like '*sarashina_tts_daemon.py*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+次の通知時に、自動で新しい設定を読み込みます。
+
+## 旧 Edge TTS が二重再生される場合
+
+起動中の Codex や Claude Code が、古い Edge TTS フックを握っている場合があります。
+その場合は、次を実行してください。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -DisableLegacyEdgeTts
+```
+
+既存ファイルは `.bak-YYYYMMDDHHMMSS` としてバックアップします。
+
+## アンインストール
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\uninstall.ps1 -RemoveCodexNotify
+```
+
+Sarashina2.2-TTS 本体も消す場合だけ、次を追加します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\uninstall.ps1 -RemoveCodexNotify -RemoveUpstreamRepo
+```
+
+## 構成
+
+| パス | 役割 |
+|---|---|
+| `install.ps1` | セットアップ本体 |
+| `uninstall.ps1` | アンインストール |
+| `scripts/codex_notify_sarashina_tts.py` | Codex `notify` からキューへ入れる入口 |
+| `scripts/sarashina_tts_daemon.py` | Sarashina2.2-TTS の常駐生成プロセス |
+| `scripts/test_notify.ps1` | 短文の動作確認 |
+| `templates/settings.example.json` | 参照音声設定の例 |
+
+## 上流
+
+- Sarashina2.2-TTS: https://github.com/sbintuitions/sarashina2.2-tts
+- Hugging Face: https://huggingface.co/sbintuitions/sarashina2.2-tts
+

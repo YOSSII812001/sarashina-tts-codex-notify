@@ -39,6 +39,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test_notify.ps1
 
 音声が鳴り、`%TEMP%\sarashina_tts_outputs` に WAV が作られれば成功です。
 
+## 読み上げ文字数
+
+既定では、1回の通知につき750文字まで読み上げます。
+これは以前の Edge TTS 設定の `MaxLength = 750` と同じです。
+
+変更したい場合は、環境変数 `SARASHINA_TTS_MAX_CHARS` を設定してください。
+長文で音声が途中で切れる場合は、`SARASHINA_TTS_MAX_TOKENS` も増やしてください。
+
 ## 参照音声を変える
 
 インストール後、次のファイルを編集します。
@@ -108,4 +116,3 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\uninstall.ps1 -RemoveCodex
 
 - Sarashina2.2-TTS: https://github.com/sbintuitions/sarashina2.2-tts
 - Hugging Face: https://huggingface.co/sbintuitions/sarashina2.2-tts
-

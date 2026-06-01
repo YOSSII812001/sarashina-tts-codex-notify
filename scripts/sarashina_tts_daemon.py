@@ -18,6 +18,8 @@ PLAYING_PID_PATH = Path(os.environ.get("TEMP", ".")) / "sarashina_tts_playing.pi
 SETTINGS_PATH = SKILL_ROOT / "settings.json"
 DEFAULT_PROMPT_URL = "https://huggingface.co/sbintuitions/sarashina2.2-tts/resolve/main/samples/zero_shot/synthesized_A.wav"
 DEFAULT_PROMPT_TEXT = "東京から金沢までは新幹線を利用するのが便利で、所要時間は約２時間半です。"
+DEFAULT_MAX_CHARS = 750
+DEFAULT_MAX_TOKENS = 1024
 
 
 def log(message: str) -> None:
@@ -116,7 +118,7 @@ def truncate_text(text: str, max_chars: int) -> str:
 
 
 def prepare_tts_text(message: str) -> str:
-    max_chars = int(os.environ.get("SARASHINA_TTS_MAX_CHARS", "240"))
+    max_chars = int(os.environ.get("SARASHINA_TTS_MAX_CHARS", str(DEFAULT_MAX_CHARS)))
     text = truncate_text(clean_text(message), max_chars)
     text = re.sub(r"([^、。！？])\n", r"\1、", text)
     text = text.replace("\n", "")
@@ -224,7 +226,7 @@ class SarashinaSpeaker:
 
     def synthesize(self, text: str, request_id: str) -> Path:
         gen_kwargs = {
-            "max_tokens": int(os.environ.get("SARASHINA_TTS_MAX_TOKENS", "512")),
+            "max_tokens": int(os.environ.get("SARASHINA_TTS_MAX_TOKENS", str(DEFAULT_MAX_TOKENS))),
             "temperature": float(os.environ.get("SARASHINA_TTS_TEMPERATURE", "0.9")),
             "top_p": float(os.environ.get("SARASHINA_TTS_TOP_P", "0.95")),
             "repetition_penalty": float(os.environ.get("SARASHINA_TTS_REPETITION_PENALTY", "1.0")),
@@ -322,4 +324,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -180,7 +180,9 @@ Copy-RepoFile "SKILL.md"
 Copy-RepoFile "scripts\codex_notify_sarashina_tts.py"
 Copy-RepoFile "scripts\sarashina_tts_daemon.py"
 Copy-RepoFile "scripts\test_notify.ps1"
+Copy-RepoFile "scripts\create_voice_reference.ps1"
 Copy-RepoFile "templates\settings.example.json"
+Copy-RepoFile "templates\settings.long-reference.example.json"
 
 $settingsPath = Join-Path $SkillRoot "settings.json"
 if (-not (Test-Path -LiteralPath $settingsPath)) {

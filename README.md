@@ -53,6 +53,37 @@ Sarashina2.2-TTS には、内部で45文字前後に分割して渡します。
 
 ## 参照音声を変える
 
+### 長めの参照音声を作る
+
+話し方や抑揚を安定させたい場合は、5秒以上の参照音声を使ってください。
+声色だけなら3秒前後でも動きますが、スタイルの安定には長めの音声が効きます。
+
+ただし、長ければ何でも良いわけではありません。
+参照音声と `prompt_text` がズレると、読み上げ品質が落ちます。
+
+許諾済みのWAVから参照音声を作る例です。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\create_voice_reference.ps1 `
+  -SourceWav "C:\path\to\your_private_voice.wav" `
+  -StartSeconds 3 `
+  -DurationSeconds 12 `
+  -PromptText "この参照音声で実際に話している文章です。"
+```
+
+このスクリプトは、次の処理をします。
+
+- 指定区間を切り出す
+- 24kHz / mono に変換する
+- 音量をそろえる
+- 不要なメタデータを削除する
+- `settings.json` を更新する
+
+長い素材を使う場合でも、冒頭の名乗り、権利者名、契約情報などは
+公開repoに入れないでください。
+
+### 手動で設定する
+
 インストール後、次のファイルを編集します。
 
 ```text
@@ -71,6 +102,7 @@ Sarashina2.2-TTS には、内部で45文字前後に分割して渡します。
 
 `prompt_text` は、参照音声で話している文章と一致させてください。
 差が大きいと、声質や話し方が崩れやすくなります。
+目安として、話し方の安定まで狙う場合は5〜20秒ほどの明瞭な音声を使ってください。
 
 変更後は、デーモンを再起動します。
 
@@ -114,7 +146,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\uninstall.ps1 -RemoveCodex
 | `scripts/codex_notify_sarashina_tts.py` | Codex `notify` からキューへ入れる入口 |
 | `scripts/sarashina_tts_daemon.py` | Sarashina2.2-TTS の常駐生成プロセス |
 | `scripts/test_notify.ps1` | 短文の動作確認 |
+| `scripts/create_voice_reference.ps1` | 許諾済みWAVから長めの参照音声を作る補助スクリプト |
 | `templates/settings.example.json` | 参照音声設定の例 |
+| `templates/settings.long-reference.example.json` | 長め参照音声設定の例 |
 
 ## 上流
 

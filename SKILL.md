@@ -20,8 +20,11 @@ Codex の `notify` payload を受け取り、Sarashina2.2-TTS で音声合成す
 `settings.json` の `prompt_file` と `prompt_text` を使う。
 第三者の声を使う場合は、本人または権利者の許諾を確認する。
 
+話し方を安定させたい場合は、5秒以上の明瞭な参照音声を使う。
+許諾済みWAVから作る場合は、`scripts/create_voice_reference.ps1` を使う。
+実音声、人物名、元ファイルパスは public repo に入れない。
+
 ## 注意
 
 Sarashina2.2-TTS とモデルのライセンスは上流に従う。
 商用利用では、必ずライセンス条件を確認する。
-

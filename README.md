@@ -51,6 +51,32 @@ Sarashina2.2-TTS には、内部で45文字前後に分割して渡します。
 長文で音声が途中で切れる場合は、`SARASHINA_TTS_TOKENS_PER_CHAR` を少し増やしてください。
 分割単位を変えたい場合は、`SARASHINA_TTS_CHUNK_CHARS` を設定してください。
 
+## 読み替え辞書
+
+Edge TTS のユーザー辞書に近い使い方として、Sarashina に渡す前の読み替え辞書を用意できます。
+
+インストール後、次のどちらかを使います。
+
+- `%USERPROFILE%\.codex\skills\sarashina-tts\settings.json` の `reading_dictionary`
+- `%USERPROFILE%\.codex\skills\sarashina-tts\dictionary.json`
+
+例:
+
+```json
+{
+  "OpenAI": "オープンエーアイ",
+  "ChatGPT": "チャットジーピーティー",
+  "max_tokens": "最大トークン数"
+}
+```
+
+`dictionary.json` は個人名や社内用語が入りやすいため、このリポジトリではgit対象外にしています。
+テンプレートは `templates/dictionary.example.json` にあります。
+
+また、既定では `force_japanese=true` です。
+辞書で置き換えたあとに残った英字トークンは、アルファベット読みへ変換します。
+これにより、Sarashina が英語風に読み上げるケースを減らします。
+
 ## 参照音声を変える
 
 ### 長めの参照音声を作る
@@ -149,6 +175,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\uninstall.ps1 -RemoveCodex
 | `scripts/create_voice_reference.ps1` | 許諾済みWAVから長めの参照音声を作る補助スクリプト |
 | `templates/settings.example.json` | 参照音声設定の例 |
 | `templates/settings.long-reference.example.json` | 長め参照音声設定の例 |
+| `templates/dictionary.example.json` | 読み替え辞書の例 |
 
 ## 上流
 

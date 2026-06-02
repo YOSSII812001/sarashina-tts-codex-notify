@@ -24,6 +24,12 @@ Codex の `notify` payload を受け取り、Sarashina2.2-TTS で音声合成す
 許諾済みWAVから作る場合は、`scripts/create_voice_reference.ps1` を使う。
 実音声、人物名、元ファイルパスは public repo に入れない。
 
+## 読み替え辞書
+
+`settings.json` の `reading_dictionary` または `dictionary.json` を使う。
+`dictionary.json` は個人名や社内語が入りやすいため、public repo へ入れない。
+既定では `force_japanese=true` とし、残った英字を日本語読みへ寄せる。
+
 ## 注意
 
 Sarashina2.2-TTS とモデルのライセンスは上流に従う。

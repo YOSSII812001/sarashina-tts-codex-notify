@@ -9,6 +9,6 @@ __pycache__/
 *.flac
 pretrained_models/
 settings.json
+dictionary.json
 .env
 .env.*
-

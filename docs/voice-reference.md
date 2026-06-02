@@ -52,3 +52,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\create_voice_refer
 
 設定を変えたあとは、`sarashina_tts_daemon.py` の Python プロセスを停止してください。
 次の通知時に、自動で再起動します。
+
+## 発音が崩れる場合
+
+英字や技術語の読みが気になる場合は、読み替え辞書を使ってください。
+
+```json
+{
+  "OpenAI": "オープンエーアイ",
+  "GitHub": "ギットハブ",
+  "max_tokens": "最大トークン数"
+}
+```
+
+`dictionary.json` は公開しないでください。
+個人名、社内用語、顧客名などが入る可能性があるためです。

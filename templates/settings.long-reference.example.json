@@ -1,5 +1,11 @@
 {
   "prompt_name": "private long reference",
   "prompt_file": "C:/Users/me/.codex/skills/sarashina-tts/assets/prompt_private_reference_long.wav",
-  "prompt_text": "参照音声で実際に話している文章を、ここに正確に入力してください。"
+  "prompt_text": "参照音声で実際に話している文章を、ここに正確に入力してください。",
+  "force_japanese": true,
+  "reading_dictionary": {
+    "OpenAI": "オープンエーアイ",
+    "ChatGPT": "チャットジーピーティー",
+    "API": "エーピーアイ"
+  }
 }

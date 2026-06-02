@@ -16,6 +16,7 @@ LOG_PATH = Path(os.environ.get("TEMP", ".")) / "sarashina_tts_debug.log"
 PID_PATH = Path(os.environ.get("TEMP", ".")) / "sarashina_tts_daemon.pid"
 PLAYING_PID_PATH = Path(os.environ.get("TEMP", ".")) / "sarashina_tts_playing.pid"
 SETTINGS_PATH = SKILL_ROOT / "settings.json"
+DICTIONARY_PATH = SKILL_ROOT / "dictionary.json"
 DEFAULT_PROMPT_URL = "https://huggingface.co/sbintuitions/sarashina2.2-tts/resolve/main/samples/zero_shot/synthesized_A.wav"
 DEFAULT_PROMPT_TEXT = "東京から金沢までは新幹線を利用するのが便利で、所要時間は約２時間半です。"
 DEFAULT_MAX_CHARS = 750
@@ -25,6 +26,129 @@ DEFAULT_MIN_TOKENS = 96
 DEFAULT_TOKENS_PER_CHAR = 8
 DEFAULT_TEMPERATURE = 0.9
 DEFAULT_TOP_P = 0.95
+DEFAULT_FORCE_JAPANESE = True
+DEFAULT_READING_DICTIONARY = {
+    "Codex": "コーデックス",
+    "Claude": "クロード",
+    "Edge TTS": "エッジ ティーティーエス",
+    "edge-tts": "エッジ ティーティーエス",
+    "Sarashina2.2-TTS": "サラシナ にーてんに ティーティーエス",
+    "Sarashina": "サラシナ",
+    "TTS": "ティーティーエス",
+    "GitHub": "ギットハブ",
+    "Git": "ギット",
+    "CodeRabbit": "コードラビット",
+    "README.md": "リードミー",
+    "README": "リードミー",
+    "settings.json": "設定ファイル",
+    "config.toml": "設定ファイル",
+    "JSON": "ジェイソン",
+    "WAV": "ウェーブ",
+    "MP3": "エムピー スリー",
+    "API": "エーピーアイ",
+    "DB": "データベース",
+    "drop": "削除",
+    "require": "リクワイア",
+    "import": "インポート",
+    "OpenAI": "オープンエーアイ",
+    "ChatGPT": "チャットジーピーティー",
+    "GPT-5": "ジーピーティー ファイブ",
+    "GPT": "ジーピーティー",
+    "LLM": "エルエルエム",
+    "MCP": "エムシーピー",
+    "CPU": "シーピーユー",
+    "GPU": "ジーピーユー",
+    "URL": "ユーアールエル",
+    "UI": "ユーアイ",
+    "HTML": "エイチティーエムエル",
+    "CSS": "シーエスエス",
+    "JavaScript": "ジャバスクリプト",
+    "TypeScript": "タイプスクリプト",
+    "JS": "ジェイエス",
+    "TS": "ティーエス",
+    "CLI": "シーエルアイ",
+    "PR": "プルリクエスト",
+    "Issue": "イシュー",
+    "main": "メイン",
+    "origin": "オリジン",
+    "commit": "コミット",
+    "push": "プッシュ",
+    "pull": "プル",
+    "merge": "マージ",
+    "branch": "ブランチ",
+    "Python": "パイソン",
+    "PowerShell": "パワーシェル",
+    "Windows": "ウィンドウズ",
+    "ffmpeg": "エフエフエムペグ",
+    "ffprobe": "エフエフプローブ",
+    "ffplay": "エフエフプレイ",
+    "max_tokens": "最大トークン数",
+    "top_p": "トップピー",
+    "temperature": "温度",
+    "JP-14": "ジェーピー じゅうよん",
+    "resume": "レジューム",
+}
+ASCII_LETTER_READINGS = {
+    "A": "エー",
+    "B": "ビー",
+    "C": "シー",
+    "D": "ディー",
+    "E": "イー",
+    "F": "エフ",
+    "G": "ジー",
+    "H": "エイチ",
+    "I": "アイ",
+    "J": "ジェー",
+    "K": "ケー",
+    "L": "エル",
+    "M": "エム",
+    "N": "エヌ",
+    "O": "オー",
+    "P": "ピー",
+    "Q": "キュー",
+    "R": "アール",
+    "S": "エス",
+    "T": "ティー",
+    "U": "ユー",
+    "V": "ブイ",
+    "W": "ダブリュー",
+    "X": "エックス",
+    "Y": "ワイ",
+    "Z": "ゼット",
+}
+ASCII_SEPARATOR_READINGS = {
+    "_": " アンダーバー ",
+    "-": " ハイフン ",
+    ".": " ドット ",
+    "/": " スラッシュ ",
+    "\\": " スラッシュ ",
+    ":": " コロン ",
+}
+JSON_SPEAKABLE_KEYS = {
+    "message",
+    "summary",
+    "title",
+    "body",
+    "description",
+    "fix",
+    "reason",
+    "result",
+    "status",
+}
+JSON_IGNORED_KEYS = {
+    "reviewer",
+    "grade",
+    "severity",
+    "category",
+    "confidence",
+    "file",
+    "path",
+    "line",
+    "start",
+    "end",
+    "priority",
+}
+JAPANESE_TEXT_RE = re.compile(r"[ぁ-んァ-ヶ一-龠]")
 
 
 def log(message: str) -> None:
@@ -88,15 +212,65 @@ def playback_active() -> bool:
         if not PLAYING_PID_PATH.exists():
             return False
         pid_text = PLAYING_PID_PATH.read_text(encoding="ascii", errors="ignore").strip()
-        return bool(pid_text) and is_process_alive(int(pid_text))
+        if not pid_text:
+            return False
+        return is_process_alive(int(pid_text))
     except Exception:
         return False
 
 
+def collect_json_speakable_values(value: object, parent_key: str = "") -> list[str]:
+    if isinstance(value, str):
+        text = value.strip()
+        if text and (JAPANESE_TEXT_RE.search(text) or parent_key in JSON_SPEAKABLE_KEYS):
+            return [text]
+        return []
+    if isinstance(value, list):
+        values = []
+        for item in value:
+            values.extend(collect_json_speakable_values(item, parent_key))
+        return values
+    if isinstance(value, dict):
+        values = []
+        for key, item in value.items():
+            key_text = str(key)
+            if key_text in JSON_IGNORED_KEYS:
+                continue
+            values.extend(collect_json_speakable_values(item, key_text))
+        return values
+    return []
+
+
+def extract_json_speakable_text(text: str) -> str | None:
+    stripped = text.strip()
+    if not stripped or stripped[0] not in "[{":
+        return None
+    try:
+        data = json.loads(stripped)
+    except Exception:
+        return None
+    values = collect_json_speakable_values(data)
+    unique_values = []
+    seen = set()
+    for value in values:
+        normalized = re.sub(r"\s+", " ", value).strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        unique_values.append(normalized)
+    if not unique_values:
+        return None
+    return "。".join(unique_values)
+
+
 def clean_text(text: str) -> str:
+    json_text = extract_json_speakable_text(text)
+    if json_text:
+        text = json_text
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = re.sub(r"```[\s\S]*?```", "", text)
-    text = re.sub(r"`[^`]*`", "", text)
+    text = re.sub(r"`([^`\n]{1,120})`", r" \1 ", text)
+    text = re.sub(r"[A-Za-z]:[\\/][^\s、。！？]+", " ファイルパス ", text)
     text = re.sub(r"(?m)^#+\s+", "", text)
     text = re.sub(r"https?://\S+", "", text)
     text = re.sub(r"\[([^\]]*)\]\([^\)]*\)", r"\1", text)
@@ -112,6 +286,100 @@ def clean_text(text: str) -> str:
     return "\n".join(line for line in lines if line).strip()
 
 
+def load_json_file(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+        log(f"json ignored because root is not object: {path}")
+    except Exception as exc:
+        log(f"json load failed: {path}: {exc}")
+    return {}
+
+
+def load_settings() -> dict:
+    return load_json_file(SETTINGS_PATH)
+
+
+def get_setting_bool(settings: dict, key: str, default: bool) -> bool:
+    env_name = "SARASHINA_TTS_" + key.upper()
+    if env_name in os.environ:
+        return os.environ[env_name].strip().lower() not in ("0", "false", "no", "off")
+    value = settings.get(key, default)
+    if isinstance(value, str):
+        return value.strip().lower() not in ("0", "false", "no", "off")
+    return bool(value)
+
+
+def normalize_dictionary(raw: object) -> dict[str, str]:
+    if isinstance(raw, dict):
+        return {str(k): str(v) for k, v in raw.items() if str(k) and str(v)}
+    if isinstance(raw, list):
+        entries = {}
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            source = item.get("from") or item.get("source")
+            target = item.get("to") or item.get("reading") or item.get("target")
+            if source and target:
+                entries[str(source)] = str(target)
+        return entries
+    return {}
+
+
+def load_reading_dictionary(settings: dict) -> dict[str, str]:
+    readings = {}
+    if not get_setting_bool(settings, "disable_default_dictionary", False):
+        readings.update(DEFAULT_READING_DICTIONARY)
+    readings.update(normalize_dictionary(load_json_file(DICTIONARY_PATH)))
+    dictionary_file = os.environ.get("SARASHINA_TTS_DICTIONARY_FILE")
+    if dictionary_file:
+        readings.update(normalize_dictionary(load_json_file(Path(dictionary_file))))
+    readings.update(normalize_dictionary(settings.get("reading_dictionary") or settings.get("readings") or {}))
+    return readings
+
+
+def apply_reading_dictionary(text: str, settings: dict) -> str:
+    readings = load_reading_dictionary(settings)
+    for source, target in sorted(readings.items(), key=lambda item: len(item[0]), reverse=True):
+        if re.search(r"[A-Za-z0-9_]", source):
+            pattern = rf"(?<![A-Za-z0-9_]){re.escape(source)}(?![A-Za-z0-9_])"
+            text = re.sub(pattern, target, text, flags=re.IGNORECASE)
+        else:
+            text = text.replace(source, target)
+    return text
+
+
+def spell_ascii_token(match: re.Match) -> str:
+    token = match.group(0)
+    if not re.search(r"[A-Za-z]", token):
+        return token
+    parts = []
+    for char in token:
+        upper = char.upper()
+        if upper in ASCII_LETTER_READINGS:
+            parts.append(ASCII_LETTER_READINGS[upper])
+        elif char.isdigit():
+            parts.append(char)
+        else:
+            parts.append(ASCII_SEPARATOR_READINGS.get(char, " "))
+    return "".join(parts)
+
+
+def force_japanese_reading(text: str) -> str:
+    text = re.sub(r"#(\d+)", r"ナンバー\1", text)
+    text = text.replace("&", " アンド ")
+    text = text.replace("@", " アットマーク ")
+    text = text.replace("%", " パーセント ")
+    text = text.replace("+", " プラス ")
+    text = text.replace("=", " イコール ")
+    text = re.sub(r"[A-Za-z][A-Za-z0-9_./:\\-]*", spell_ascii_token, text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
+
+
 def truncate_text(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
@@ -122,11 +390,18 @@ def truncate_text(text: str, max_chars: int) -> str:
     return text[:max_chars].strip()
 
 
-def prepare_tts_text(message: str) -> str:
+def prepare_tts_text(message: str, settings: dict | None = None) -> str:
+    settings = settings or load_settings()
     max_chars = int(os.environ.get("SARASHINA_TTS_MAX_CHARS", str(DEFAULT_MAX_CHARS)))
-    text = truncate_text(clean_text(message), max_chars)
+    text = clean_text(message)
+    text = apply_reading_dictionary(text, settings)
+    if get_setting_bool(settings, "force_japanese", DEFAULT_FORCE_JAPANESE):
+        text = force_japanese_reading(text)
+    text = truncate_text(text, max_chars)
     text = re.sub(r"([^、。！？])\n", r"\1、", text)
     text = text.replace("\n", "")
+    text = re.sub(r"。{2,}", "。", text)
+    text = re.sub(r"、{2,}", "、", text)
     if text and text[-1] not in "。！？.!?":
         text += "。"
     return text
@@ -186,19 +461,6 @@ def ensure_default_prompt(path: Path) -> None:
     log(f"default prompt saved: {path}")
 
 
-def load_settings() -> dict:
-    if not SETTINGS_PATH.exists():
-        return {}
-    try:
-        data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            return data
-        log(f"settings ignored because root is not object: {SETTINGS_PATH}")
-    except Exception as exc:
-        log(f"settings load failed: {exc}")
-    return {}
-
-
 def resolve_path(value: str, base: Path) -> Path:
     path = Path(value).expanduser()
     if path.is_absolute():
@@ -246,6 +508,7 @@ def play_audio(path: Path) -> bool:
 class SarashinaSpeaker:
     def __init__(self) -> None:
         settings = load_settings()
+        self.settings = settings
         root = Path(os.environ.get("SARASHINA_TTS_ROOT", Path.home() / "tools" / "sarashina2.2-tts"))
         if not root.exists():
             raise RuntimeError(f"SARASHINA_TTS_ROOT not found: {root}")
@@ -338,7 +601,7 @@ def handle_request(speaker: SarashinaSpeaker, path: Path) -> None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         request_id = str(data.get("id") or path.stem)
-        text = prepare_tts_text(str(data.get("message") or "Codexのターンが完了しました。"))
+        text = prepare_tts_text(str(data.get("message") or "Codexのターンが完了しました。"), speaker.settings)
         if not text:
             log(f"empty text after cleaning: {path.name}")
             return
@@ -350,7 +613,7 @@ def handle_request(speaker: SarashinaSpeaker, path: Path) -> None:
             beep()
     except Exception:
         log(f"request failed: {path.name}\n{traceback.format_exc()}")
-        show_toast("Codex", "Sarashina2.2-TTS failed.")
+        show_toast("Codex", "Sarashina2.2-TTS の読み上げに失敗しました。")
         beep()
     finally:
         try:

@@ -19,7 +19,12 @@ SETTINGS_PATH = SKILL_ROOT / "settings.json"
 DEFAULT_PROMPT_URL = "https://huggingface.co/sbintuitions/sarashina2.2-tts/resolve/main/samples/zero_shot/synthesized_A.wav"
 DEFAULT_PROMPT_TEXT = "東京から金沢までは新幹線を利用するのが便利で、所要時間は約２時間半です。"
 DEFAULT_MAX_CHARS = 750
-DEFAULT_MAX_TOKENS = 1024
+DEFAULT_MAX_TOKENS = 512
+DEFAULT_CHUNK_CHARS = 45
+DEFAULT_MIN_TOKENS = 96
+DEFAULT_TOKENS_PER_CHAR = 8
+DEFAULT_TEMPERATURE = 0.9
+DEFAULT_TOP_P = 0.95
 
 
 def log(message: str) -> None:
@@ -127,6 +132,51 @@ def prepare_tts_text(message: str) -> str:
     return text
 
 
+def split_tts_text(text: str, max_chars: int) -> list[str]:
+    if len(text) <= max_chars:
+        return [text]
+
+    chunks: list[str] = []
+    current = ""
+    parts = re.findall(r".+?[。！？.!?]+|.+$", text)
+
+    def push(value: str) -> None:
+        value = value.strip()
+        if value:
+            chunks.append(value)
+
+    for part in parts:
+        part = part.strip()
+        while len(part) > max_chars:
+            cut = -1
+            for mark in ("。", "！", "？", ". ", "、", " "):
+                idx = part.rfind(mark, 0, max_chars)
+                if idx > int(max_chars * 0.35):
+                    cut = idx + len(mark)
+                    break
+            if cut < 0:
+                cut = max_chars
+            segment = part[:cut].strip()
+            if current:
+                push(current)
+                current = ""
+            push(segment)
+            part = part[cut:].strip()
+
+        if not part:
+            continue
+        if not current:
+            current = part
+        elif len(current) + len(part) <= max_chars:
+            current += part
+        else:
+            push(current)
+            current = part
+
+    push(current)
+    return chunks
+
+
 def ensure_default_prompt(path: Path) -> None:
     if path.exists() and path.stat().st_size > 1000:
         return
@@ -154,6 +204,24 @@ def resolve_path(value: str, base: Path) -> Path:
     if path.is_absolute():
         return path
     return base / path
+
+
+def combine_audio_files(paths: list[str], output_path: Path, sample_rate: int) -> Path:
+    import numpy as np
+    import soundfile as sf
+
+    arrays = []
+    for i, path in enumerate(paths):
+        data, sr = sf.read(path, dtype="float32", always_2d=True)
+        if sr != sample_rate:
+            raise RuntimeError(f"unexpected sample rate: {path}: {sr} != {sample_rate}")
+        arrays.append(data)
+        if i < len(paths) - 1:
+            arrays.append(np.zeros((int(sample_rate * 0.08), data.shape[1]), dtype="float32"))
+
+    combined = np.concatenate(arrays, axis=0)
+    sf.write(str(output_path), combined, sample_rate)
+    return output_path
 
 
 def play_audio(path: Path) -> bool:
@@ -225,25 +293,39 @@ class SarashinaSpeaker:
         log("speaker ready")
 
     def synthesize(self, text: str, request_id: str) -> Path:
-        gen_kwargs = {
-            "max_tokens": int(os.environ.get("SARASHINA_TTS_MAX_TOKENS", str(DEFAULT_MAX_TOKENS))),
-            "temperature": float(os.environ.get("SARASHINA_TTS_TEMPERATURE", "0.9")),
-            "top_p": float(os.environ.get("SARASHINA_TTS_TOP_P", "0.95")),
+        chunk_chars = int(os.environ.get("SARASHINA_TTS_CHUNK_CHARS", str(DEFAULT_CHUNK_CHARS)))
+        chunks = split_tts_text(text, chunk_chars)
+        log(f"chunked {request_id}: {len(chunks)} chunks, lengths={[len(chunk) for chunk in chunks]}")
+        max_tokens_cap = int(os.environ.get("SARASHINA_TTS_MAX_TOKENS", str(DEFAULT_MAX_TOKENS)))
+        min_tokens = int(os.environ.get("SARASHINA_TTS_MIN_TOKENS", str(DEFAULT_MIN_TOKENS)))
+        tokens_per_char = int(os.environ.get("SARASHINA_TTS_TOKENS_PER_CHAR", str(DEFAULT_TOKENS_PER_CHAR)))
+        base_gen_kwargs = {
+            "temperature": float(os.environ.get("SARASHINA_TTS_TEMPERATURE", str(DEFAULT_TEMPERATURE))),
+            "top_p": float(os.environ.get("SARASHINA_TTS_TOP_P", str(DEFAULT_TOP_P))),
             "repetition_penalty": float(os.environ.get("SARASHINA_TTS_REPETITION_PENALTY", "1.0")),
         }
-        wavs = self.generator.generate(
-            [text],
-            flow_embedding=self.flow_embedding,
-            audio_prompt_text=self.prompt_text,
-            audio_prompt_tokens=self.audio_prompt_tokens,
-            audio_prompt_feat=self.audio_prompt_feat,
-            audio_prompt_path=str(self.prompt_file),
-            flow_embedding_only=False,
-            watermark=os.environ.get("SARASHINA_TTS_WATERMARK", "1") != "0",
-            gen_kwargs=gen_kwargs,
-        )
+        wavs = []
+        for index, chunk in enumerate(chunks, start=1):
+            gen_kwargs = dict(base_gen_kwargs)
+            gen_kwargs["max_tokens"] = min(max_tokens_cap, max(min_tokens, len(chunk) * tokens_per_char))
+            log(f"generating chunk {index}/{len(chunks)} ({gen_kwargs['max_tokens']} tokens): {chunk}")
+            wavs.extend(
+                self.generator.generate(
+                    [chunk],
+                    flow_embedding=self.flow_embedding,
+                    audio_prompt_text=self.prompt_text,
+                    audio_prompt_tokens=self.audio_prompt_tokens,
+                    audio_prompt_feat=self.audio_prompt_feat,
+                    audio_prompt_path=str(self.prompt_file),
+                    flow_embedding_only=False,
+                    watermark=os.environ.get("SARASHINA_TTS_WATERMARK", "1") != "0",
+                    gen_kwargs=gen_kwargs,
+                )
+            )
         paths = self.generator.save_audios(wavs, output_dir=str(self.output_dir), prefix=f"{request_id}_")
-        return Path(paths[0])
+        if len(paths) == 1:
+            return Path(paths[0])
+        return combine_audio_files(paths, self.output_dir / f"{request_id}_combined.wav", self.sample_rate)
 
 
 def next_request() -> Path | None:

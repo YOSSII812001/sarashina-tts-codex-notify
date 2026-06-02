@@ -44,8 +44,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test_notify.ps1
 既定では、1回の通知につき750文字まで読み上げます。
 これは以前の Edge TTS 設定の `MaxLength = 750` と同じです。
 
+Sarashina2.2-TTS には、内部で45文字前後に分割して渡します。
+長文を1本で渡すと、本文を省略したり崩したりすることがあるためです。
+
 変更したい場合は、環境変数 `SARASHINA_TTS_MAX_CHARS` を設定してください。
-長文で音声が途中で切れる場合は、`SARASHINA_TTS_MAX_TOKENS` も増やしてください。
+長文で音声が途中で切れる場合は、`SARASHINA_TTS_TOKENS_PER_CHAR` を少し増やしてください。
+分割単位を変えたい場合は、`SARASHINA_TTS_CHUNK_CHARS` を設定してください。
 
 ## 参照音声を変える
 
